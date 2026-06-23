@@ -322,5 +322,57 @@ document.getElementById("q").addEventListener("input",e=>{state.q=e.target.value
 
 renderTabs();renderFilters();renderContent();router();
 </script>
+  <!-- ====== АВТО-ВЫСОТА IFRAME + ЦЕНТРИРОВАНИЕ МОДАЛКИ ====== -->
+<script>
+(function () {
+  // --- 1. Сообщаем родителю реальную высоту контента ---
+  var lastH = 0;
+  function sendHeight() {
+    var h = Math.ceil(document.documentElement.getBoundingClientRect().height);
+    if (h && h !== lastH) {
+      lastH = h;
+      parent.postMessage({ mpeiType: 'height', height: h }, '*');
+    }
+  }
+  window.addEventListener('load', sendHeight);
+  window.addEventListener('resize', sendHeight);
+  if (window.ResizeObserver) new ResizeObserver(sendHeight).observe(document.body);
+  setInterval(sendHeight, 800); // подстраховка для асинхронной отрисовки/шрифтов
+  sendHeight();
+
+  // --- 2. Центрируем модалку в реальном окне пользователя ---
+  // (iframe теперь высокий, position:fixed внутри него уехал бы за экран)
+  var overlay = document.getElementById('modalOverlay');
+  var info = null;
+
+  window.addEventListener('message', function (e) {
+    if (e.data && e.data.mpeiType === 'pageInfo') { info = e.data; place(); }
+  });
+
+  function place() {
+    if (!overlay || !overlay.classList.contains('open') || !info) return;
+    var top = info.scrollY - info.offsetTop; // верх видимой области в координатах iframe
+    overlay.style.position = 'absolute';
+    overlay.style.top = Math.max(0, top) + 'px';
+    overlay.style.bottom = 'auto';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = info.viewportH + 'px';
+  }
+  function reset() {
+    if (!overlay) return;
+    overlay.style.position = overlay.style.top = overlay.style.bottom =
+      overlay.style.left = overlay.style.width = overlay.style.height = '';
+  }
+  if (overlay) {
+    new MutationObserver(function () {
+      if (overlay.classList.contains('open')) {
+        parent.postMessage({ mpeiType: 'getPageInfo' }, '*');
+        place();
+      } else { reset(); }
+    }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
+  }
+})();
+</script>
 </body>
 </html>
